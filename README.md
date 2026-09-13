@@ -1,61 +1,51 @@
-# Emulador CG50 (para Windows)
+# CAGIO CG 50
 
-Emulador de hardware, escrito desde cero, inspirado en la calculadora
-grafica **Casio fx-CG50**: implementa un nucleo de CPU compatible con un
-subconjunto de la arquitectura **SH-4** (la familia usada en la serie
-Prizm/CG de Casio), un bus de memoria y perifericos simplificados (LCD a
-color, teclado, timer), con una interfaz grafica **nativa de Windows**
-(GDI puro, sin librerias externas como SDL2).
+Una calculadora cientifica para Windows, con una interfaz inspirada en el
+diseno fisico de las calculadoras graficadoras de Casio (pantalla + teclado
+con SHIFT, funciones cientificas, cruceta, etc.), pero con su propia marca
+("CAGIO CG 50") y un motor de calculo propio escrito desde cero -- no es
+una copia ni contiene ningun software de Casio.
 
-**No incluye el firmware/OS real de Casio** (es software propietario). Lee
-[`docs/ROM.md`](docs/ROM.md) para el porque y para como usar tus propios
-binarios SH-4 o un volcado legalmente obtenido de tu propia calculadora.
+Ademas, el repositorio incluye un segundo proyecto tecnico separado: un
+emulador de **hardware** (nucleo de CPU SH-4, la familia usada en las
+calculadoras graficadoras reales) para quien quiera experimentar a bajo
+nivel. Ver la seccion [Nucleo de hardware SH-4](#nucleo-de-hardware-sh-4-avanzado)
+mas abajo.
 
 ## Descargar el ejecutable ya compilado
 
-Si solo quieres probarlo sin compilar nada: en la seccion
-[Releases](../../releases) de este repositorio (o el ultimo build subido)
-esta `cg50emu.exe`, listo para ejecutar en Windows con doble clic. No
-necesita instalar nada (SDL2, vcpkg, etc.): esta enlazado de forma
-estatica.
+Si solo quieres probarla sin compilar nada: pide el archivo
+`CG50Calc.exe` (o compila el tuyo con los pasos de abajo). Esta enlazado
+de forma estatica -- no necesita instalar nada, solo doble clic.
 
-## Estado del proyecto
+## La calculadora (`cg50calc`)
 
-Version inicial / base de trabajo. Funciona de caja: trae un demo interno
-en ensamblador SH-4 (escrito a mano, sin toolchain externo) que enciende el
-LCD emulado y pinta pixeles, para demostrar que CPU + bus + LCD + GUI estan
-correctamente conectados. Ver limitaciones conocidas en
-[`docs/ROM.md`](docs/ROM.md) (FPU, MMU, interrupciones reales, etc. aun no
-implementadas).
+- Interfaz dibujada a mano (Win32/GDI puro, sin librerias externas) que
+  imita la distribucion fisica tipica de una calculadora graficadora:
+  pantalla, teclas F1-F6, SHIFT, cruceta de navegacion/historial, teclado
+  cientifico y numerico.
+- Motor de expresiones propio (`src/calc/engine.h`/`.cpp`): suma, resta,
+  multiplicacion, division, potencias, parentesis, multiplicacion
+  implicita (`2sin(30)`, `2(3+4)`), funciones trigonometricas (con su
+  inversa via SHIFT), logaritmos, raiz cuadrada, `Ans`, `pi`, `e`,
+  porcentaje.
+- Escribe con el mouse (clic en las teclas) o con el teclado del PC
+  (numeros, operadores, Enter = EXE, Backspace = DEL, Esc = AC, flechas
+  izquierda/derecha mueven el cursor, arriba/abajo navegan el historial de
+  calculos anteriores).
+- Modo grados/radianes conmutable con la tecla MENU.
 
-## Compilar en Windows
-
-Requisitos: CMake >= 3.16 y un compilador C++17 (MSVC o MinGW). **No hace
-falta SDL2 ni vcpkg** -- la interfaz grafica usa unicamente la API de
-Windows (GDI), que ya viene con el sistema.
+Compilar (Windows, MSVC o MinGW; no requiere SDL2 ni vcpkg):
 
 ```powershell
 cmake -B build -S .
 cmake --build build --config Release
 ```
 
-El ejecutable queda en `build/Release/cg50emu.exe` (o `build/cg50emu.exe`
+El ejecutable queda en `build/Release/cg50calc.exe` (o `build/cg50calc.exe`
 con MinGW).
 
-## Compilar en Linux/macOS (desarrollo del nucleo)
-
-La ventana grafica (`cg50emu`) es especifica de Windows (usa `<windows.h>`
-directamente), asi que en Linux/macOS solo se compilan el nucleo
-(`cg50core`), las pruebas (`cpu_tests`) y la herramienta de volcado
-headless (`cg50dump`, ver mas abajo):
-
-```bash
-cmake -B build -S .
-cmake --build build
-ctest --test-dir build --output-on-failure
-```
-
-### Cross-compilar el .exe de Windows desde Linux
+Cross-compilar desde Linux/macOS con MinGW:
 
 ```bash
 sudo apt install g++-mingw-w64-x86-64
@@ -63,49 +53,68 @@ cmake -B build-win -S . -DCMAKE_TOOLCHAIN_FILE=scripts/toolchain-mingw64.cmake -
 cmake --build build-win
 ```
 
-Genera `build-win/cg50emu.exe`, enlazado de forma estatica (sin
-dependencias extra, solo las DLL de sistema de Windows: GDI32, USER32,
-KERNEL32).
+Genera `build-win/cg50calc.exe`, sin dependencias extra aparte de las DLL
+de sistema de Windows (GDI32, USER32, KERNEL32).
 
-## Uso
+## Nucleo de hardware SH-4 (avanzado)
+
+Este repositorio tambien contiene, como proyecto tecnico separado, un
+emulador de **hardware** de bajo nivel: un interprete de un subconjunto de
+la arquitectura SH-4 (`src/cpu`), un bus de memoria con LCD/teclado/timer
+simplificados (`src/mem`, `src/devices`) y un ejecutable de demostracion
+(`cg50emu`) que corre un programa SH-4 de prueba (o binarios propios) sin
+requerir ningun firmware de Casio -- ver [`docs/ROM.md`](docs/ROM.md) y
+[`docs/HARDWARE.md`](docs/HARDWARE.md) para el detalle. No tiene relacion
+con la calculadora de arriba (esa usa un motor de calculo nativo en C++,
+no pasa por esta CPU emulada).
 
 ```powershell
 # Con un binario SH-4 propio:
 cg50emu.exe mi_programa.bin
-
-# Sin argumentos: corre el demo interno (no requiere ningun archivo)
+# Sin argumentos: corre el demo interno
 cg50emu.exe
 ```
 
-Controles por defecto (ver `src/gui/window.cpp` para el mapeo completo):
-flechas = cursor, F1-F6 = teclas de funcion, teclado numerico = digitos,
-Enter = EXE, Esc = EXIT.
-
-### cg50dump: capturas sin abrir ninguna ventana
-
-Sirve para verificar el emulador (o generar una captura) sin necesitar
-pantalla ni Windows:
+`cg50dump` genera una captura del framebuffer sin abrir ninguna ventana
+(util para verificar sin pantalla ni Windows):
 
 ```bash
 cg50dump salida.bmp [rom.bin] [instrucciones]
 ```
 
+## Compilar y probar en Linux/macOS (sin las GUI, que son especificas de Windows)
+
+```bash
+cmake -B build -S .
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+Compila el nucleo SH-4 (`cg50core`), el motor de calculo (`cg50calclib`),
+`cg50dump` y las pruebas (`cpu_tests`, `calc_engine_tests`).
+
 ## Estructura del codigo
 
 ```
-src/cpu/      Nucleo del interprete SH-4 (sh4.h/.cpp)
-src/mem/      Bus de memoria: ROM, RAM y perifericos (bus.h/.cpp)
-src/devices/  LCD, teclado y timer (simplificados)
-src/gui/      Ventana nativa de Windows (GDI): dibuja el framebuffer y traduce el teclado
-src/demo/     Programa SH-4 de demostracion, sin ROM externa
-src/tools/    Herramienta cg50dump (captura headless, multiplataforma)
-src/util/     Utilidades compartidas (escritura de BMP)
-tests/        Pruebas basicas del nucleo de CPU (sin dependencias)
-docs/         Notas sobre el mapa de hardware y sobre la ROM/firmware
-scripts/      Toolchain de CMake para cross-compilar a Windows con MinGW
+src/calc/       Motor de expresiones de la calculadora (multiplataforma)
+src/calc_gui/   Interfaz Win32/GDI de la calculadora (CAGIO CG 50)
+src/main_calc.cpp   Punto de entrada de cg50calc
+
+src/cpu/        Nucleo del interprete SH-4 (proyecto tecnico separado)
+src/mem/        Bus de memoria: ROM, RAM y perifericos
+src/devices/    LCD, teclado y timer (simplificados)
+src/gui/        Ventana Win32/GDI del emulador de hardware (cg50emu)
+src/demo/       Programa SH-4 de demostracion, sin ROM externa
+src/main.cpp    Punto de entrada de cg50emu
+
+src/tools/      Herramienta cg50dump (captura headless, multiplataforma)
+src/util/       Utilidades compartidas (escritura de BMP)
+tests/          Pruebas del motor de calculo y del nucleo de CPU
+docs/           Notas sobre el mapa de hardware y sobre la ROM/firmware
+scripts/        Toolchain de CMake para cross-compilar a Windows con MinGW
 ```
 
 ## Licencia
 
 MIT (ver [`LICENSE`](LICENSE)). No cubre, obviamente, ningun firmware de
-terceros que decidas cargar en el emulador.
+terceros que decidas cargar en el emulador de hardware.
