@@ -4,9 +4,12 @@
 #include <chrono>
 #include <thread>
 
+#include <cstring>
+
 #include "cpu/sh4.h"
 #include "mem/bus.h"
 #include "gui/window.h"
+#include "gui/bmp_writer.h"
 #include "demo/demo_rom.h"
 
 namespace {
@@ -24,19 +27,31 @@ constexpr int kInstructionsPerFrame = 200000;
 } // namespace
 
 int main(int argc, char** argv) {
+    // --dump-bmp <salida.bmp> [rom.bin]: corre sin ventana/SDL2 y vuelca el
+    // framebuffer a un BMP. Util para verificar en CI o sin display.
+    std::string dump_path;
+    std::string rom_path;
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--dump-bmp") == 0 && i + 1 < argc) {
+            dump_path = argv[++i];
+        } else {
+            rom_path = argv[i];
+        }
+    }
+
     emu::Bus bus;
 
     bool using_demo = true;
-    if (argc > 1) {
-        auto rom = ReadFile(argv[1]);
+    if (!rom_path.empty()) {
+        auto rom = ReadFile(rom_path);
         if (rom.empty()) {
-            std::fprintf(stderr, "No se pudo leer el ROM '%s'. Se usara el demo interno.\n", argv[1]);
+            std::fprintf(stderr, "No se pudo leer el ROM '%s'. Se usara el demo interno.\n", rom_path.c_str());
         } else if (!bus.LoadRom(rom)) {
             std::fprintf(stderr, "El ROM '%s' es demasiado grande (max %u bytes). Se usara el demo interno.\n",
-                         argv[1], emu::kRomSize);
+                         rom_path.c_str(), emu::kRomSize);
         } else {
             using_demo = false;
-            std::printf("ROM cargado: %s (%zu bytes)\n", argv[1], rom.size());
+            std::printf("ROM cargado: %s (%zu bytes)\n", rom_path.c_str(), rom.size());
         }
     }
     if (using_demo) {
@@ -49,6 +64,16 @@ int main(int argc, char** argv) {
     cpu.on_unimplemented = [](uint32_t pc, uint16_t op) {
         std::fprintf(stderr, "CPU detenida: opcode no implementado 0x%04X en PC=0x%08X\n", op, pc);
     };
+
+    if (!dump_path.empty()) {
+        for (int i = 0; i < kInstructionsPerFrame && !cpu.Halted(); ++i) {
+            cpu.Step();
+            bus.TickPeripherals();
+        }
+        bool ok = gui::WriteFramebufferBmp(dump_path, bus.Lcd());
+        std::printf(ok ? "Captura guardada en %s\n" : "No se pudo escribir %s\n", dump_path.c_str());
+        return ok ? 0 : 1;
+    }
 
     gui::Window window(2);
     if (!window.Init("Emulador Casio CG50 (SH-4 core, sin firmware real)")) {

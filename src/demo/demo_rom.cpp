@@ -29,8 +29,8 @@ std::vector<uint8_t> BuildFillDemo() {
     w.push_back(SHLL8(2));         // R2 = 0x1000
     w.push_back(ADD_RM(1, 2));     // R1 = 0x18001000  (framebuffer base)
     w.push_back(MOV_IMM(3, -1));   // R3 = 0xFFFFFFFF -> low 16 bits = white (0xFFFF)
-    w.push_back(MOV_IMM(4, 0x10)); // R4 = 0x10
-    w.push_back(SHLL8(4));         // R4 = 0x1000 (4096 pixels to paint)
+    w.push_back(MOV_IMM(4, 0x40)); // R4 = 0x40
+    w.push_back(SHLL8(4));         // R4 = 0x4000 (16384 pixels to paint, ~42 filas)
 
     const size_t loop_idx = w.size();
     w.push_back(MOVW_STORE(1, 3)); // *R1 = R3 (one white pixel)
