@@ -14,9 +14,18 @@ mas abajo.
 
 ## Descargar el ejecutable ya compilado
 
-Si solo quieres probarla sin compilar nada: pide el archivo
-`CG50Calc.exe` (o compila el tuyo con los pasos de abajo). Esta enlazado
-de forma estatica -- no necesita instalar nada, solo doble clic.
+Si solo quieres probarla sin compilar nada, en la carpeta
+[`dist/`](dist/) de este repositorio estan los .exe ya compilados:
+
+- [`dist/CAGIO_CG50.exe`](dist/CAGIO_CG50.exe) -- la calculadora.
+- [`dist/EmuladorHardwareSH4.exe`](dist/EmuladorHardwareSH4.exe) -- el
+  demo del nucleo de hardware SH-4 (ver mas abajo).
+
+Para descargarlos desde GitHub: entra a la carpeta `dist/`, haz clic en el
+archivo `.exe` que quieras, y en la pagina del archivo pulsa el boton
+**Download raw file** (el icono de flecha hacia abajo, arriba a la
+derecha del visor). Ambos estan enlazados de forma estatica -- no
+necesitan instalar nada, solo doble clic.
 
 ## La calculadora (`cg50calc`)
 

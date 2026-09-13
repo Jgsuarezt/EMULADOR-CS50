@@ -4,6 +4,7 @@ out/
 *.obj
 *.o
 *.exe
+!/dist/*.exe
 *.pdb
 *.ilk
 .vs/
