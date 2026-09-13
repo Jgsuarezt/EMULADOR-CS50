@@ -30,7 +30,7 @@ implementacion propia y no una replica del chip real.
 ## Teclado
 
 Matriz de 8 filas x 8 columnas. El mapeo de teclas de PC -> (fila, columna)
-usado por la interfaz SDL2 esta definido en `src/gui/window.cpp`
+usado por la interfaz nativa de Windows (GDI) esta definido en `src/gui/window.cpp`
 (`kKeyMap`) y no corresponde al escaneo real del teclado de la calculadora.
 
 ## CPU

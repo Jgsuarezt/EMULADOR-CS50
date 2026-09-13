@@ -1,104 +1,137 @@
 #include "window.h"
-#include <cstdio>
-#include <cstring>
 
 namespace gui {
 
 namespace {
+constexpr wchar_t kClassName[] = L"CG50EmuWindowClass";
+
 // Simplified key layout (row, col) in the 8x8 matrix. This is an original
-// mapping (not a reproduction of Casio's real scan matrix) chosen to be
+// mapping (not a reproduction of Casio's real scan matrix), chosen to be
 // convenient with a PC keyboard. See docs/HARDWARE.md.
-struct KeyMap { SDL_Scancode sc; int row; int col; };
+struct KeyMap { int vk; int row; int col; };
 const KeyMap kKeyMap[] = {
-    { SDL_SCANCODE_F1, 0, 0 }, { SDL_SCANCODE_F2, 0, 1 }, { SDL_SCANCODE_F3, 0, 2 },
-    { SDL_SCANCODE_F4, 0, 3 }, { SDL_SCANCODE_F5, 0, 4 }, { SDL_SCANCODE_F6, 0, 5 },
-    { SDL_SCANCODE_LSHIFT, 0, 6 }, { SDL_SCANCODE_LALT, 0, 7 }, // SHIFT / ALPHA
+    { VK_F1, 0, 0 }, { VK_F2, 0, 1 }, { VK_F3, 0, 2 },
+    { VK_F4, 0, 3 }, { VK_F5, 0, 4 }, { VK_F6, 0, 5 },
+    { VK_SHIFT, 0, 6 }, { VK_MENU, 0, 7 }, // SHIFT / ALPHA
 
-    { SDL_SCANCODE_UP, 1, 0 }, { SDL_SCANCODE_DOWN, 1, 1 },
-    { SDL_SCANCODE_LEFT, 1, 2 }, { SDL_SCANCODE_RIGHT, 1, 3 },
-    { SDL_SCANCODE_ESCAPE, 1, 4 }, { SDL_SCANCODE_TAB, 1, 5 }, // EXIT / MENU
+    { VK_UP, 1, 0 }, { VK_DOWN, 1, 1 },
+    { VK_LEFT, 1, 2 }, { VK_RIGHT, 1, 3 },
+    { VK_ESCAPE, 1, 4 }, { VK_TAB, 1, 5 }, // EXIT / MENU
 
-    { SDL_SCANCODE_7, 2, 0 }, { SDL_SCANCODE_8, 2, 1 }, { SDL_SCANCODE_9, 2, 2 },
-    { SDL_SCANCODE_SLASH, 2, 3 },
-
-    { SDL_SCANCODE_4, 3, 0 }, { SDL_SCANCODE_5, 3, 1 }, { SDL_SCANCODE_6, 3, 2 },
-    { SDL_SCANCODE_KP_MULTIPLY, 3, 3 },
-
-    { SDL_SCANCODE_1, 4, 0 }, { SDL_SCANCODE_2, 4, 1 }, { SDL_SCANCODE_3, 4, 2 },
-    { SDL_SCANCODE_MINUS, 4, 3 },
-
-    { SDL_SCANCODE_0, 5, 0 }, { SDL_SCANCODE_PERIOD, 5, 1 }, { SDL_SCANCODE_RETURN, 5, 2 },
-    { SDL_SCANCODE_EQUALS, 5, 3 }, // EXE / ADD
+    { '7', 2, 0 }, { '8', 2, 1 }, { '9', 2, 2 }, { VK_DIVIDE, 2, 3 },
+    { '4', 3, 0 }, { '5', 3, 1 }, { '6', 3, 2 }, { VK_MULTIPLY, 3, 3 },
+    { '1', 4, 0 }, { '2', 4, 1 }, { '3', 4, 2 }, { VK_SUBTRACT, 4, 3 },
+    { '0', 5, 0 }, { VK_OEM_PERIOD, 5, 1 }, { VK_RETURN, 5, 2 }, { VK_ADD, 5, 3 },
 };
 constexpr int kKeyMapCount = sizeof(kKeyMap) / sizeof(kKeyMap[0]);
 } // namespace
 
 Window::Window(int scale) : scale_(scale) {}
-
 Window::~Window() { Shutdown(); }
 
-bool Window::Init(const std::string& title) {
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-        std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
-        return false;
-    }
-    window_ = SDL_CreateWindow(title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                                devices::Lcd::kWidth * scale_, devices::Lcd::kHeight * scale_, 0);
-    if (!window_) return false;
-    renderer_ = SDL_CreateRenderer(window_, -1, SDL_RENDERER_ACCELERATED);
-    if (!renderer_) renderer_ = SDL_CreateRenderer(window_, -1, SDL_RENDERER_SOFTWARE);
-    if (!renderer_) return false;
-    texture_ = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_STREAMING,
-                                  devices::Lcd::kWidth, devices::Lcd::kHeight);
-    return texture_ != nullptr;
-}
-
-void Window::Shutdown() {
-    if (texture_) { SDL_DestroyTexture(texture_); texture_ = nullptr; }
-    if (renderer_) { SDL_DestroyRenderer(renderer_); renderer_ = nullptr; }
-    if (window_) { SDL_DestroyWindow(window_); window_ = nullptr; }
-    SDL_Quit();
-}
-
-bool Window::MapKey(SDL_Scancode sc, int& row, int& col) const {
+bool Window::MapKey(WPARAM vk, int& row, int& col) {
     for (int i = 0; i < kKeyMapCount; ++i) {
-        if (kKeyMap[i].sc == sc) { row = kKeyMap[i].row; col = kKeyMap[i].col; return true; }
+        if (kKeyMap[i].vk == static_cast<int>(vk)) { row = kKeyMap[i].row; col = kKeyMap[i].col; return true; }
     }
     return false;
 }
 
-bool Window::PollEvents(emu::Bus& bus) {
-    SDL_Event ev;
-    while (SDL_PollEvent(&ev)) {
-        if (ev.type == SDL_QUIT) return false;
-        if (ev.type == SDL_KEYDOWN || ev.type == SDL_KEYUP) {
-            int row, col;
-            if (MapKey(ev.key.keysym.scancode, row, col)) {
-                bus.Keypad().SetKey(row, col, ev.type == SDL_KEYDOWN);
-            }
-            if (ev.key.keysym.scancode == SDL_SCANCODE_Q && (ev.key.keysym.mod & KMOD_CTRL)) {
-                return false;
-            }
-        }
+LRESULT CALLBACK Window::WndProcThunk(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+    Window* self;
+    if (msg == WM_NCCREATE) {
+        auto* cs = reinterpret_cast<CREATESTRUCTW*>(lp);
+        self = reinterpret_cast<Window*>(cs->lpCreateParams);
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
+    } else {
+        self = reinterpret_cast<Window*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
     }
+    if (self) return self->HandleMessage(hwnd, msg, wp, lp);
+    return DefWindowProcW(hwnd, msg, wp, lp);
+}
+
+LRESULT Window::HandleMessage(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+    switch (msg) {
+    case WM_CLOSE:
+    case WM_DESTROY:
+        quit_ = true;
+        PostQuitMessage(0);
+        return 0;
+    case WM_KEYDOWN:
+    case WM_KEYUP: {
+        int row, col;
+        if (bus_ && MapKey(wp, row, col)) {
+            bus_->Keypad().SetKey(row, col, msg == WM_KEYDOWN);
+        }
+        return 0;
+    }
+    default:
+        return DefWindowProcW(hwnd, msg, wp, lp);
+    }
+}
+
+bool Window::Init(const std::string& title) {
+    WNDCLASSEXW wc = {};
+    wc.cbSize = sizeof(wc);
+    wc.style = CS_HREDRAW | CS_VREDRAW;
+    wc.lpfnWndProc = &Window::WndProcThunk;
+    wc.hInstance = GetModuleHandleW(nullptr);
+    wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+    wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+    wc.lpszClassName = kClassName;
+    if (!RegisterClassExW(&wc)) return false;
+
+    RECT rect = { 0, 0, devices::Lcd::kWidth * scale_, devices::Lcd::kHeight * scale_ };
+    AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
+
+    std::wstring wtitle(title.begin(), title.end());
+    hwnd_ = CreateWindowExW(0, kClassName, wtitle.c_str(), WS_OVERLAPPEDWINDOW,
+                             CW_USEDEFAULT, CW_USEDEFAULT,
+                             rect.right - rect.left, rect.bottom - rect.top,
+                             nullptr, nullptr, wc.hInstance, this);
+    if (!hwnd_) return false;
+
+    ShowWindow(hwnd_, SW_SHOWDEFAULT);
+    UpdateWindow(hwnd_);
     return true;
 }
 
-void Window::Present(emu::Bus& bus) {
-    void* pixels = nullptr;
-    int pitch = 0;
-    if (SDL_LockTexture(texture_, nullptr, &pixels, &pitch) == 0) {
-        const auto& fb = bus.Lcd().Framebuffer();
-        auto* dst = static_cast<uint8_t*>(pixels);
-        int row_bytes = devices::Lcd::kWidth * 2;
-        for (int y = 0; y < devices::Lcd::kHeight; ++y) {
-            std::memcpy(dst + y * pitch, fb.data() + y * row_bytes, row_bytes);
-        }
-        SDL_UnlockTexture(texture_);
+void Window::Shutdown() {
+    if (hwnd_) { DestroyWindow(hwnd_); hwnd_ = nullptr; }
+}
+
+bool Window::PollEvents(emu::Bus& bus) {
+    bus_ = &bus;
+    MSG msg;
+    while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+        if (msg.message == WM_QUIT) quit_ = true;
+        TranslateMessage(&msg);
+        DispatchMessageW(&msg);
     }
-    SDL_RenderClear(renderer_);
-    SDL_RenderCopy(renderer_, texture_, nullptr, nullptr);
-    SDL_RenderPresent(renderer_);
+    return !quit_;
+}
+
+void Window::Present(emu::Bus& bus) {
+    if (!hwnd_) return;
+    const auto& fb = bus.Lcd().Framebuffer();
+
+    struct { BITMAPINFOHEADER header; DWORD masks[3]; } bmi = {};
+    bmi.header.biSize = sizeof(BITMAPINFOHEADER);
+    bmi.header.biWidth = devices::Lcd::kWidth;
+    bmi.header.biHeight = -devices::Lcd::kHeight; // negative = top-down source
+    bmi.header.biPlanes = 1;
+    bmi.header.biBitCount = 16;
+    bmi.header.biCompression = BI_BITFIELDS;
+    bmi.masks[0] = 0xF800; // R
+    bmi.masks[1] = 0x07E0; // G
+    bmi.masks[2] = 0x001F; // B
+
+    HDC hdc = GetDC(hwnd_);
+    RECT client;
+    GetClientRect(hwnd_, &client);
+    StretchDIBits(hdc, 0, 0, client.right - client.left, client.bottom - client.top,
+                  0, 0, devices::Lcd::kWidth, devices::Lcd::kHeight,
+                  fb.data(), reinterpret_cast<BITMAPINFO*>(&bmi), DIB_RGB_COLORS, SRCCOPY);
+    ReleaseDC(hwnd_, hdc);
 }
 
 } // namespace gui

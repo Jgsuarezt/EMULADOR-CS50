@@ -19,28 +19,23 @@ add_library(cg50core STATIC
 )
 target_include_directories(cg50core PUBLIC src)
 
-# --- GUI executable (needs SDL2) -------------------------------------------
-find_package(SDL2 CONFIG QUIET)
-if(NOT SDL2_FOUND)
-    find_package(SDL2 MODULE QUIET)
-endif()
-
-if(SDL2_FOUND OR TARGET SDL2::SDL2)
+# --- GUI executable (native Win32/GDI, no external dependency) ------------
+if(WIN32)
     add_executable(cg50emu src/main.cpp src/gui/window.cpp)
-    target_link_libraries(cg50emu PRIVATE cg50core)
-    if(TARGET SDL2::SDL2)
-        target_link_libraries(cg50emu PRIVATE SDL2::SDL2 SDL2::SDL2main)
-    else()
-        target_include_directories(cg50emu PRIVATE ${SDL2_INCLUDE_DIRS})
-        target_link_libraries(cg50emu PRIVATE ${SDL2_LIBRARIES})
-    endif()
+    target_link_libraries(cg50emu PRIVATE cg50core gdi32 user32)
+    target_compile_definitions(cg50emu PRIVATE UNICODE _UNICODE)
 else()
-    message(WARNING "SDL2 no encontrado: no se generara el ejecutable grafico 'cg50emu'.\n"
-                     "Instala SDL2 (por ejemplo con vcpkg: vcpkg install sdl2) y vuelve a "
-                     "ejecutar CMake. El nucleo (cg50core) y las pruebas se compilan igual.")
+    message(STATUS "El ejecutable grafico 'cg50emu' usa la API nativa de Windows (GDI), "
+                    "asi que solo se genera compilando para Windows (nativo con MSVC/MinGW, "
+                    "o cruzado con el toolchain de scripts/toolchain-mingw64.cmake). "
+                    "En este sistema se compilan igual el nucleo (cg50core) y las pruebas.")
 endif()
 
-# --- Tests (no SDL2 dependency) --------------------------------------------
+# --- Headless dump/screenshot tool (cross-platform, no GUI dependency) ----
+add_executable(cg50dump src/tools/dump_demo_main.cpp)
+target_link_libraries(cg50dump PRIVATE cg50core)
+
+# --- Tests (cross-platform) -------------------------------------------------
 enable_testing()
 add_executable(cpu_tests tests/cpu_tests.cpp)
 target_link_libraries(cpu_tests PRIVATE cg50core)

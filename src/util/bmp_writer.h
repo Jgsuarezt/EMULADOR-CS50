@@ -5,11 +5,12 @@
 #include <vector>
 #include "../devices/lcd.h"
 
-namespace gui {
+namespace util {
 
-// Writes the LCD framebuffer (RGB565) out as a plain 24-bit BMP. Useful for
-// headless verification (CI, screenshots) where no display/SDL2 is
-// available -- no dependency on SDL2 at all.
+// Writes the LCD framebuffer (RGB565) out as a plain 24-bit BMP. Platform
+// neutral (no Windows/SDL2 dependency) -- used by the cg50dump tool for
+// headless verification and screenshots (e.g. in CI, or where there is no
+// display at all).
 inline bool WriteFramebufferBmp(const std::string& path, const devices::Lcd& lcd) {
     const int w = devices::Lcd::kWidth;
     const int h = devices::Lcd::kHeight;
@@ -51,4 +52,4 @@ inline bool WriteFramebufferBmp(const std::string& path, const devices::Lcd& lcd
     return true;
 }
 
-} // namespace gui
+} // namespace util
